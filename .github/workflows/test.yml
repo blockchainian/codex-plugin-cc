@@ -1,0 +1,19 @@
+# ABOUTME: CI for the execute engine — runs the stub-codex test suite on Linux and macOS.
+name: test
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: skills/execute/tests/test-execute.sh
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: brew install coreutils
+      - run: sudo ln -sf "$(which gtimeout)" /usr/local/bin/timeout || ln -sf "$(which gtimeout)" "$(brew --prefix)/bin/timeout"
+      - run: skills/execute/tests/test-execute.sh

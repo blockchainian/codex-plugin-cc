@@ -1,0 +1,14 @@
+{
+  "name": "codex-plugin-cc",
+  "description": "Community extension of the official codex plugin: /codex:execute delivers a planned feature as parallel codex tasks off Claude's critical path.",
+  "owner": {
+    "name": "blockchainian"
+  },
+  "plugins": [
+    {
+      "name": "codex",
+      "source": "./",
+      "description": "Execute a planned feature as parallel codex tasks off Claude's critical path \u2014 from a plan to a pushed branch, codex-reviewed, with one PR."
+    }
+  ]
+}

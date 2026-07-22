@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+# ABOUTME: Test stand-in for the codex CLI. Reads the task marker embedded in the prompt and
+# ABOUTME: simulates pass / fail-once / hang / no-op / conflicting tasks plus merge resolution.
+set -u
+
+DIR=.
+PROMPT=""
+OFILE=""
+MODE=exec
+args=("$@")
+i=0
+while [ $i -lt ${#args[@]} ]; do
+  a="${args[$i]}"
+  case "$a" in
+    -C) i=$((i+1)); DIR="${args[$i]}" ;;
+    -o) i=$((i+1)); OFILE="${args[$i]}" ;;
+    -s|-m|-c|-p) i=$((i+1)) ;;
+    review) MODE=review ;;
+    exec|--ephemeral|--skip-git-repo-check|--json|--uncommitted) ;;
+    --base) i=$((i+1)) ;;
+    *) PROMPT="$a" ;;
+  esac
+  i=$((i+1))
+done
+
+log() { echo "$1 dir=$DIR" >> "${STUB_DIR:?}/invocations.log"; }
+bump() { echo x >> "${STUB_DIR:?}/calls-$1"; }
+
+if [ "$MODE" = "review" ]; then
+  bump REVIEW; log REVIEW
+  [ -n "$OFILE" ] && echo "stub review: no findings" > "$OFILE"
+  echo "stub review done"
+  exit 0
+fi
+
+case "$PROMPT" in
+  *"merge conflict"*)
+    bump MERGE-RESOLVE; log MERGE-RESOLVE
+    echo "ok-merged" > "$DIR/c.txt"
+    git -C "$DIR" add c.txt
+    ;;
+  *TASK-OK*)
+    bump TASK-OK; log TASK-OK
+    echo "ok-task1" > "$DIR/a.txt"
+    ;;
+  *TASK-FAILONCE*)
+    bump TASK-FAILONCE; log TASK-FAILONCE
+    case "$PROMPT" in
+      *"PREVIOUS ATTEMPT FAILED"*) echo "ok-task2" > "$DIR/b.txt" ;;
+      *) echo "bad" > "$DIR/b.txt" ;;
+    esac
+    ;;
+  *TASK-HANG*)
+    bump TASK-HANG; log TASK-HANG
+    sleep 30
+    ;;
+  *TASK-NOOP*)
+    bump TASK-NOOP; log TASK-NOOP
+    ;;
+  *TASK-C1*)
+    bump TASK-C1; log TASK-C1
+    echo "ok-task5" > "$DIR/c.txt"
+    ;;
+  *TASK-C2*)
+    bump TASK-C2; log TASK-C2
+    echo "ok-task6" > "$DIR/c.txt"
+    ;;
+  *)
+    bump UNKNOWN; log "UNKNOWN prompt=$PROMPT"
+    exit 1
+    ;;
+esac
+echo "stub codex done"
+exit 0
