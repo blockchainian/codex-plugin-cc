@@ -25,13 +25,18 @@ measured workload. Full rationale and numbers: [docs/design.md](docs/design.md).
 
 ```
 /plugin marketplace add blockchainian/codex-plugin-cc
-/plugin install codex@codex-plugin-cc
+/plugin install codex@blockchainian
 ```
+
+(This registers the `blockchainian` marketplace — the same marketplace also
+served by [grok-plugin-cc](https://github.com/blockchainian/grok-plugin-cc);
+both repos define it identically and list both plugins, so adding either repo
+works and a later add simply switches which repo sources it.)
 
 This plugin intentionally shares the `codex` plugin name with the official
 plugin. Installing both is supported — installed-plugin identity is
 `name@marketplace`, so they coexist as `codex@openai-codex` and
-`codex@codex-plugin-cc` — but the shared `/codex:` command namespace is not
+`codex@blockchainian` — but the shared `/codex:` command namespace is not
 formally documented behavior; if the combination misbehaves in your setup,
 please open an issue.
 

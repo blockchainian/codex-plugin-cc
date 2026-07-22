@@ -1,14 +1,35 @@
 {
-  "name": "codex-plugin-cc",
-  "description": "Community extension of the official codex plugin: /codex:execute delivers a planned feature as parallel codex tasks off Claude's critical path.",
+  "name": "blockchainian",
   "owner": {
     "name": "blockchainian"
+  },
+  "metadata": {
+    "description": "Claude Code plugin marketplace for blockchainian's plugins: Grok and Codex review/task-delegation tooling.",
+    "version": "0.2.0"
   },
   "plugins": [
     {
       "name": "codex",
-      "source": "./",
-      "description": "Execute a planned feature as parallel codex tasks off Claude's critical path \u2014 from a plan to a pushed branch, codex-reviewed, with one PR."
+      "description": "Execute a planned feature as parallel codex tasks off Claude's critical path \u2014 from a plan to a pushed branch, codex-reviewed, with one PR.",
+      "version": "0.2.0",
+      "author": {
+        "name": "blockchainian"
+      },
+      "source": "./"
+    },
+    {
+      "name": "grok",
+      "description": "Use the local Grok CLI from Claude Code for code review and task delegation.",
+      "version": "0.1.0",
+      "author": {
+        "name": "blockchainian"
+      },
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/blockchainian/grok-plugin-cc.git",
+        "path": "plugins/grok",
+        "ref": "main"
+      }
     }
   ]
 }
