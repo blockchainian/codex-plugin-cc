@@ -1,7 +1,7 @@
 {
   "name": "codex",
   "description": "Execute a planned feature as parallel codex tasks off Claude's critical path \u2014 plan handover, worktree-pool execution with per-task checks and bounded retries, merge to one feature branch, codex review, push, single PR.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": {
     "name": "blockchainian"
   },
