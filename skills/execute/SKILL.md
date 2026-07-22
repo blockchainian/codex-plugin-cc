@@ -1,9 +1,9 @@
 ---
-name: execute
+name: "codex:execute"
 description: Execute a planned feature as parallel codex tasks off the Claude critical path — convert the session's plan into spec.md+tasks.txt, launch execute.sh (worktree pool, per-task checks, bounded retries, merge to one feature branch, codex review, push, single PR), then relay the PR. Use when the user wants many-at-once implementation work delegated to codex.
 ---
 
-# execute — parallel codex execution off the Claude critical path
+# codex:execute — parallel codex execution off the Claude critical path
 
 Claude plans once and never re-enters; git + the filesystem are the
 coordination bus. Engine: `${CLAUDE_PLUGIN_ROOT}/skills/execute/execute.sh`.
