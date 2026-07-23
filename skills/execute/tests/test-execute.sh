@@ -128,7 +128,7 @@ assert "GitHub review output is concise" \
 assert "console summary uses compact fields" \
   grep -q '^codex:execute: summary: feature=feat-x base=main tasks=6 pass=4 fail=2 merged=4 post-merge=pass reviewed pushed$' "$SCRATCH/run.log"
 assert "review progress uses concise wording" \
-  grep -q '^codex:execute: \[review\] reviewing feat-x vs main$' "$SCRATCH/run.log"
+  grep -q '^codex:execute: \[review\] feat-x vs main$' "$SCRATCH/run.log"
 assert "review result identifies the result file" \
   grep -q '^codex:execute: \[review\] result: .*/logs/review.md$' "$SCRATCH/run.log"
 assert "push output omits the feature name" \

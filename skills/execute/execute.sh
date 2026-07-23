@@ -296,7 +296,7 @@ done
 # ---------- review (local codex review of the integrated diff) ----------
 REVIEW="skip"
 if [ "$POST" = "pass" ]; then
-  note "[review] reviewing $FEATURE vs $BASE"
+  note "[review] $FEATURE vs $BASE"
   if timeout "$TIMEOUT_S" "$CODEX" exec -C "$FT" -o "$RUN_DIR/logs/review.md" \
        review --base "$BASE" > "$RUN_DIR/logs/review.log" 2>&1; then
     REVIEW="done"; note "[review] result: $RUN_DIR/logs/review.md"
