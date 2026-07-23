@@ -97,6 +97,11 @@ assert_eq "task3 (hang) invoked retries+1 times" 2 "$(count TASK-HANG)"
 assert_eq "task4 (noop) invoked retries+1 times" 2 "$(count TASK-NOOP)"
 assert_eq "merge conflict resolved via codex exactly once" 1 "$(count MERGE-RESOLVE)"
 
+# progress output
+assert_eq "first attempts omit attempt number" 0 "$(grep -c 'attempt 1' "$SCRATCH/run.log" || true)"
+assert "retry start includes attempt number" grep -q '\[task 2\] attempt 2 starting' "$SCRATCH/run.log"
+assert "retry pass includes attempt number" grep -q '\[task 2\] PASS (attempt 2)' "$SCRATCH/run.log"
+
 # task worktrees cleaned, feature worktree kept
 assert "task worktree w1 removed" test ! -e "$WT_ROOT/w1"
 assert "task worktree w2 removed" test ! -e "$WT_ROOT/w2"

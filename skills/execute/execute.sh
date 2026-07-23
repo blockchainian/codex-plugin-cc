@@ -114,6 +114,12 @@ Task: $LINE"
   result="fail"; reason=""; failctx=""; a=0
   while [ "$a" -lt $((RETRIES+1)) ]; do
     a=$((a+1))
+    attempt_prefix=""
+    attempt_suffix=""
+    if [ "$a" -gt 1 ]; then
+      attempt_prefix="attempt $a "
+      attempt_suffix=" (attempt $a)"
+    fi
     PROMPT="$PREAMBLE"
     if [ "$a" -gt 1 ]; then
       PROMPT="$PREAMBLE
@@ -122,21 +128,21 @@ PREVIOUS ATTEMPT FAILED (attempt $((a-1)) of $((RETRIES+1))): $reason
 $failctx
 Fix it."
     fi
-    note "[task $idx] attempt $a starting (slot w$SLOT)"
+    note "[task $idx] ${attempt_prefix}starting (slot w$SLOT)"
     timeout "$TIMEOUT_S" "$CODEX" exec -C "$WT" -s workspace-write --ephemeral \
       -o "$LOGD/task-$idx-a$a.last" "$PROMPT" > "$LOGD/task-$idx-a$a.codex.log" 2>&1
     rc=$?
     if [ "$rc" -eq 124 ]; then
       reason="timeout"; failctx="codex hit the ${TIMEOUT_S}s per-invocation timeout"
-      note "[task $idx] attempt $a red: timeout"; continue
+      note "[task $idx] ${attempt_prefix}red: timeout"; continue
     elif [ "$rc" -ne 0 ]; then
       reason="codex-exit-$rc"; failctx="$(tail -c 3000 "$LOGD/task-$idx-a$a.codex.log")"
-      note "[task $idx] attempt $a red: codex exited $rc"; continue
+      note "[task $idx] ${attempt_prefix}red: codex exited $rc"; continue
     fi
     commits="$(git -C "$WT" rev-list --count "$BASE"..HEAD 2>/dev/null || echo 0)"
     if [ "$commits" = "0" ] && [ -z "$(git -C "$WT" status --porcelain)" ]; then
       reason="no-diff"; failctx="codex completed but produced no changes"
-      note "[task $idx] attempt $a red: no diff"; continue
+      note "[task $idx] ${attempt_prefix}red: no diff"; continue
     fi
     (cd "$WT" && eval "$CHECK") > "$LOGD/task-$idx-a$a.check.log" 2>&1
     crc=$?
@@ -146,11 +152,11 @@ Fix it."
         git -C "$WT" commit -q -m "task $idx: $(echo "$LINE" | cut -c1-60)"
       fi
       result="pass"; reason="check-green"
-      note "[task $idx] PASS (attempt $a)"
+      note "[task $idx] PASS${attempt_suffix}"
       break
     fi
     reason="check-failed"; failctx="$(tail -c 3000 "$LOGD/task-$idx-a$a.check.log")"
-    note "[task $idx] attempt $a red: check failed (exit $crc)"
+    note "[task $idx] ${attempt_prefix}red: check failed (exit $crc)"
   done
 
   if [ "$result" != "pass" ]; then
