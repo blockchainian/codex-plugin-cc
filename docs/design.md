@@ -1,6 +1,7 @@
 # Parallel Codex Execution Workflow — Design
 
-Status: revised per review decisions (2026-07-22).
+Status: revised per review decisions (2026-07-22); delivery retargeted to the
+session branch per DX feedback (2026-07-23).
 
 ## Problem
 
@@ -49,10 +50,10 @@ wall no matter how many tasks run.
 ## Pipeline
 
 ```
-1. Plan          — Claude (one turn): write spec.md + tasks.txt
-2. Execute       — Codex ×N in parallel worktrees: task → check → task branch (bounded retries)
-3. Merge & Push  — task branches → feature worktree/branch; conflicts resolved here; push
-4. Review        — Codex reviews the feature branch as one PR; merge to base on green
+1. Plan            — Claude (one turn): write spec.md + tasks.txt
+2. Execute         — Codex ×N in parallel worktrees: task → check → task branch (bounded retries)
+3. Merge           — task branches → the session branch, in the session worktree; conflicts resolved here
+4. Review & Push   — Codex reviews the merged task delta locally; push the session branch; @codex reviews the PR
 ```
 
 ### 1. Plan (Claude, one turn)
@@ -93,33 +94,51 @@ The engine's first half. Responsibilities:
   commit), exclude it
   from the merge, and report it in the run summary and the PR body.
 
-### 3. Merge & Push (script + Codex, no Claude)
+### 3. Merge (script + Codex, no Claude) — onto the session branch
 
-The engine's second half.
-- Create the **feature worktree/branch** from `base`.
-- Merge green task branches into the feature branch one at a time. Clean merges
-  are the expected case — the planner made tasks file-disjoint.
+The engine's second half. **There is no intermediate feature branch or
+worktree** (removed 2026-07-23: when a session starts on a branch, results
+must land on that branch — a synthetic branch adds a PR-merge-pull loop the
+user never asked for, and task→integration→session is one merge stage too
+many).
+
+- Preconditions, checked before the first merge: the session worktree is still
+  on the session branch and still clean; otherwise the merge phase is BLOCKED
+  and every green task branch is kept.
+- Record pre-merge HEAD as `refs/codex-execute/<run>/pre-merge`.
+- Merge green task branches onto the session branch one at a time, in the
+  session worktree. Clean merges are the expected case — the planner made
+  tasks file-disjoint.
 - On conflict (expected only where `spec.md` flagged an overlap): resolve at
-  merge — `codex exec` in the feature worktree with the conflict and `spec.md`
+  merge — `codex exec` in the session worktree with the conflict and `spec.md`
   as context.
-- After the last merge, run `check` once on the feature branch: conflict
-  resolutions are code that no task gate covered.
-- Delete task worktrees and task branches, push the feature branch, open **one
-  PR** against `base`.
+- After the last merge, run `check` once on the session branch: conflict
+  resolutions are code that no task gate covered. A RED check restores the
+  branch with `git reset --keep` to the pre-merge commit and keeps the green
+  task branches for autopsy — the session worktree ends exactly where it
+  started.
+- Delete task worktrees and merged task branches.
 
-### 4. Review (Codex, one PR)
+### 4. Review & deliver (Codex, no Claude)
 
-- Codex reviews the feature-branch PR on GitHub; merge to `base` on green.
+- Local `codex exec review --base <pre-merge>` covers exactly the merged task
+  delta (not older commits already on the branch); findings land in the run
+  logs.
+- Push the session branch. If it has an open PR, the PR updates and gets an
+  `@codex review` comment — the GitHub app reviews the whole PR. Otherwise a
+  PR is opened FROM the session branch to the repo's default branch.
 - **No Claude review step.** Correctness rests on three deterministic-ish
   gates: each task's own check, the post-merge check on the integrated branch,
-  and Codex's GitHub review — not a single model's judgment used as a gate.
+  and Codex's reviews — not a single model's judgment used as a gate.
 
 ## Parameters (this must be generic and reusable across sessions)
 
 Nothing project-specific is baked in. Per invocation:
 - `tasks`       — the work list / spec pointers
-- `base`        — branch to integrate into
-- `feature`     — integration branch name (must not already exist)
+- `base`        — the session branch (default: the repo's checked-out branch;
+  when given explicitly it must match the checkout)
+- `feature`     — run name; namespaces task branches and run state (no branch
+  is created with this name)
 - `check`       — per-task verify command (`yarn test`, `cargo test`, …)
 - `concurrency` — default = CPU count, overridable
 - `retries`     — per-task retry budget on a red check (default 2)
@@ -144,13 +163,14 @@ Nothing project-specific is baked in. Per invocation:
   the PR as a bonus for the codex GitHub app. codex-cli rejects combining
   `--base` with custom review instructions — review focus lives in spec.md.
 - **Artifact locations**: Claude (not codex) authors `spec.md` + `tasks.txt`,
-  stored at `specs/<date>-<feature>/` on the base branch; codex reads them
+  stored at `specs/<date>-<feature>/` on the session branch; codex reads them
   from each task worktree. Engine takes `--spec` to reference them in prompts.
-- **Existing-PR delivery** (`--onto-base`): when the base branch already has
-  an open PR (several features accumulating on one branch), the engine pushes
-  `feature:base` (fast-forward; rejects if base moved mid-run) so the existing
-  PR updates instead of opening a new one, then deletes the feature
-  worktree/branch.
+- **Session-branch delivery** (2026-07-23, replacing the earlier feature-branch
+  and `--onto-base` modes): the run always delivers onto the branch the
+  session has checked out. An open PR for that branch simply updates; a PR is
+  created from it only when none exists. The old default — integrate on a
+  synthetic feature branch and PR it into base — is gone: it left the user's
+  checkout without the results and forced a merge-then-pull round trip.
 
 ## Rejected alternatives (do not re-propose without new reasoning)
 - **Claude Code Workflow with Codex-in-each-agent** — double-wraps every task
@@ -162,9 +182,15 @@ Nothing project-specific is baked in. Per invocation:
 - **Shared worktree across tasks** — data race on file writes.
 - **One worktree per task** — unnecessary; pool sized to concurrency suffices.
 - **One PR per task** — review fragments into N small diffs and the integrated
-  result is never reviewed or tested as a whole; `base` takes N separate merge
-  events. One feature PR reviews the integrated diff; failed tasks stay
-  isolated anyway because they are excluded at merge.
+  result is never reviewed or tested as a whole; the session branch takes N
+  separate merge events. One PR from the session branch reviews the integrated
+  diff; failed tasks stay isolated anyway because they are excluded at merge.
+- **Intermediate feature branch/worktree for integration** — removed
+  2026-07-23. It kept the session checkout pristine during the run, but the
+  run ends with the results somewhere the user isn't, plus an extra merge
+  stage (task → feature → base) and an extra worktree needing deps
+  provisioning. End-of-run convergence to the session branch with a
+  `reset --keep` restore on red gives the same safety without the detour.
 - **Persistent worktree pool across runs** — standing cleanup discipline bought
   for a spin-up cost that is already small; worktrees live only from first use
   to end of merge.

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ABOUTME: End-to-end test for execute.sh using a fixture git repo and the stub codex CLI.
-# ABOUTME: Covers pass, retry-on-red-check, hang/timeout, no-diff, conflict resolution, cleanup, push.
+# ABOUTME: Covers pass, retry, hang, no-diff, conflicts, session-branch delivery, restore, guards.
 set -u
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -37,6 +37,7 @@ mkdir -p "$STUB_BIN"
 cat > "$STUB_BIN/gh" <<'EOF'
 #!/bin/sh
 case "$1 $2" in
+  "pr view") [ "${GH_VIEW_OK:-0}" = "1" ] || exit 1 ;;
   "pr create") echo "https://github.com/example/app/pull/42" ;;
   "pr comment") ;;
   *) exit 1 ;;
@@ -58,6 +59,8 @@ for f in a.txt b.txt c.txt; do
     *) echo "BAD content in $f"; exit 1 ;;
   esac
 done
+# d and e pass alone but fail combined: drives the post-merge-red scenario
+if [ -f d.txt ] && [ -f e.txt ]; then echo "d.txt and e.txt conflict"; exit 1; fi
 exit 0
 EOF
 echo "shared spec for tasks" > "$FIX/spec.md"
@@ -74,9 +77,11 @@ git init -q --bare "$ORIGIN"
 git -C "$FIX" remote add origin "$ORIGIN"
 git -C "$FIX" push -q origin main
 
-# ---------- run ----------
+BASE0="$(git -C "$FIX" rev-parse main)"
+
+# ---------- scenario 1: partial run, delivery onto the session branch ----------
 set +e
-"$ENGINE" --tasks "$FIX/tasks.txt" --base main --feature feat-x \
+"$ENGINE" --tasks "$FIX/tasks.txt" --feature feat-x \
   --check "sh ./check.sh" --concurrency 2 --retries 1 --timeout 3 \
   --repo "$FIX" > "$SCRATCH/run.log" 2>&1
 RC=$?
@@ -85,21 +90,23 @@ set -e 2>/dev/null || true
 echo "---- engine exit=$RC (log: $SCRATCH/run.log) ----"
 
 # ---------- assertions ----------
-assert_eq "exit code 2 (partial: failed tasks, feature green)" 2 "$RC"
+assert_eq "exit code 2 (partial: failed tasks, session branch green)" 2 "$RC"
 
 WT_ROOT="$(dirname "$FIX")/.codex-execute-feat-x"
-FT="$WT_ROOT/feature"
 
-# feature branch content
-assert "feature worktree exists" test -d "$FT"
-assert_eq "a.txt from task 1" "ok-task1" "$(cat "$FT/a.txt" 2>/dev/null)"
-assert_eq "b.txt from task 2 retry" "ok-task2" "$(cat "$FT/b.txt" 2>/dev/null)"
-assert_eq "c.txt conflict resolved by codex" "ok-merged" "$(cat "$FT/c.txt" 2>/dev/null)"
+# merged content landed on the session branch, in the session worktree
+assert_eq "still on main" "main" "$(git -C "$FIX" symbolic-ref --short HEAD)"
+assert_eq "a.txt from task 1" "ok-task1" "$(cat "$FIX/a.txt" 2>/dev/null)"
+assert_eq "b.txt from task 2 retry" "ok-task2" "$(cat "$FIX/b.txt" 2>/dev/null)"
+assert_eq "c.txt conflict resolved by codex" "ok-merged" "$(cat "$FIX/c.txt" 2>/dev/null)"
+assert "merge commits are on main" \
+  sh -c "git -C '$FIX' log --oneline main | grep -q 'merge task 1'"
+assert_eq "pre-merge ref recorded at run-start commit" "$BASE0" \
+  "$(git -C "$FIX" rev-parse refs/codex-execute/feat-x/pre-merge 2>/dev/null)"
 
-# push happened
-assert "feature branch pushed to origin" git -C "$ORIGIN" rev-parse --verify refs/heads/feat-x
-assert_eq "origin feat-x == local feat-x" \
-  "$(git -C "$FIX" rev-parse feat-x)" "$(git -C "$ORIGIN" rev-parse feat-x)"
+# push happened: session branch delivered
+assert_eq "origin main == local main" \
+  "$(git -C "$FIX" rev-parse main)" "$(git -C "$ORIGIN" rev-parse main)"
 
 # retry / attempt counts via stub
 count() { wc -l < "$STUB_DIR/calls-$1" 2>/dev/null | tr -d ' ' || echo 0; }
@@ -128,23 +135,22 @@ assert "GitHub review output is concise" \
 assert "console summary uses compact fields" \
   grep -q '^codex:execute: summary: feature=feat-x base=main tasks=6 pass=4 fail=2 merged=4 post-merge=pass reviewed pushed$' "$SCRATCH/run.log"
 assert "review progress uses concise wording" \
-  grep -q '^codex:execute: \[review\] feat-x vs main$' "$SCRATCH/run.log"
+  grep -q '^codex:execute: \[review\] merged tasks vs pre-merge$' "$SCRATCH/run.log"
 assert "review result identifies the result file" \
   grep -q '^codex:execute: \[review\] result: .*/logs/review.md$' "$SCRATCH/run.log"
-assert "push output omits the feature name" \
+assert "push output omits the branch name" \
   grep -q '^codex:execute: pushed to origin$' "$SCRATCH/run.log"
-assert "worktree output uses concise label" \
-  grep -q "^codex:execute: worktree: $FT$" "$SCRATCH/run.log"
-assert "worktree output precedes logs" \
-  awk '/^codex:execute: worktree:/{worktree=NR} /^codex:execute: logs:/{logs=NR} END {exit !(worktree && logs && worktree < logs)}' "$SCRATCH/run.log"
-assert_eq "review result is not repeated at the end" 0 \
-  "$(grep -c '^codex:execute: review result:' "$SCRATCH/run.log" || true)"
+assert "delivery target announced" \
+  grep -q "^codex:execute: delivering onto branch 'main' in $FIX$" "$SCRATCH/run.log"
+assert "delivery target precedes logs" \
+  awk '/^codex:execute: delivering onto/{d=NR} /^codex:execute: logs:/{l=NR} END {exit !(d && l && d < l)}' "$SCRATCH/run.log"
 
-# task worktrees cleaned, feature worktree kept
-assert "task worktree w1 removed" test ! -e "$WT_ROOT/w1"
-assert "task worktree w2 removed" test ! -e "$WT_ROOT/w2"
+# worktree pool cleaned up entirely (no feature worktree exists at all)
+assert "worktree root fully removed" test ! -e "$WT_ROOT"
 assert_eq "git worktree list has no task worktrees" 0 \
-  "$(git -C "$FIX" worktree list | grep -c "$WT_ROOT/w" || true)"
+  "$(git -C "$FIX" worktree list | grep -c "$WT_ROOT" || true)"
+L="$(git -C "$FIX" rev-parse --absolute-git-dir)/codex-execute/feat-x/logs"
+assert "pool respected concurrency=2 (no w3 created)" test ! -e "$L/w3.create.log"
 
 # merged + clean-failed task branches deleted (failed tasks had no commits)
 assert_eq "no task branches left" 0 "$(git -C "$FIX" branch --list 'tasks/feat-x/*' | wc -l | tr -d ' ')"
@@ -154,41 +160,95 @@ ST="$(git -C "$FIX" rev-parse --absolute-git-dir)/codex-execute/feat-x/status"
 assert "summary.json exists" test -f "$ST/summary.json"
 assert_eq "4 tasks passed" 4 "$(grep -c '"result": "pass"' "$ST"/task-*.json | awk -F: '{s+=$2} END {print s}')"
 assert_eq "2 tasks failed" 2 "$(grep -c '"result": "fail"' "$ST"/task-*.json | awk -F: '{s+=$2} END {print s}')"
+assert "summary records delivery to main" grep -q '"delivered_to": "main"' "$ST/summary.json"
+assert "summary records no restore" grep -q '"restored": false' "$ST/summary.json"
 
-# failed tasks not in feature branch
-assert "no stray files from failed tasks" test ! -e "$FT/hang.txt"
-
-# concurrency: only w1/w2 ever created (pool of 2 for 6 tasks)
-assert_eq "worktree pool respected concurrency=2" 0 "$(ls -d "$WT_ROOT"/w3 2>/dev/null | wc -l | tr -d ' ')"
+# failed tasks not on the session branch
+assert "no stray files from failed tasks" test ! -e "$FIX/hang.txt"
 
 # local review ran once and produced findings file
-L="$(git -C "$FIX" rev-parse --absolute-git-dir)/codex-execute/feat-x/logs"
 assert_eq "local codex review ran once" 1 "$(count REVIEW)"
 assert_eq "review findings captured" "stub review: no findings" "$(cat "$L/review.md" 2>/dev/null)"
 
-# ---------- scenario 2: --onto-base (existing-PR branch mode) ----------
-printf 'TASK-OK write a.txt per spec.md\n' > "$FIX/tasks2.txt"
+# ---------- scenario 2: all green, existing PR for the session branch ----------
+# TASK-C1 rewrites c.txt (scenario 1 left "ok-merged"), so the task has a real diff
+printf 'TASK-C1 write c.txt (variant 1)\n' > "$FIX/tasks2.txt"
+git -C "$FIX" add tasks2.txt && git -C "$FIX" commit -qm "tasks2" && git -C "$FIX" push -q origin main
 set +e
-"$ENGINE" --tasks "$FIX/tasks2.txt" --base main --feature feat-y \
+GH_VIEW_OK=1 "$ENGINE" --tasks "$FIX/tasks2.txt" --base main --feature feat-y \
   --check "sh ./check.sh" --concurrency 1 --retries 0 --timeout 3 \
-  --onto-base --repo "$FIX" > "$SCRATCH/run2.log" 2>&1
+  --repo "$FIX" > "$SCRATCH/run2.log" 2>&1
 RC2=$?
 set -e 2>/dev/null || true
 echo "---- scenario 2 exit=$RC2 (log: $SCRATCH/run2.log) ----"
 
-assert_eq "onto-base run exits 0 (all green)" 0 "$RC2"
-assert "origin main advanced with task merge" \
+assert_eq "all-green run exits 0" 0 "$RC2"
+assert "origin main advanced with the new merge" \
   sh -c "git -C '$ORIGIN' log --oneline main | grep -q 'merge task 1'"
-assert "no feat-y branch on origin" \
-  sh -c "! git -C '$ORIGIN' rev-parse --verify -q refs/heads/feat-y"
-assert "local feat-y branch deleted after delivery" \
-  sh -c "! git -C '$FIX' rev-parse --verify -q refs/heads/feat-y"
+assert_eq "origin main == local main after delivery" \
+  "$(git -C "$FIX" rev-parse main)" "$(git -C "$ORIGIN" rev-parse main)"
+assert "existing PR path comments instead of creating" \
+  grep -q '^codex:execute: existing PR updates; GitHub review requested$' "$SCRATCH/run2.log"
 assert "feat-y worktree root fully removed" test ! -e "$(dirname "$FIX")/.codex-execute-feat-y"
-assert_eq "review also ran for onto-base run" 2 "$(count REVIEW)"
+assert_eq "review also ran for scenario 2" 2 "$(count REVIEW)"
 assert "all-green summary only includes passed tasks" \
   grep -q '^codex:execute: PASS \[1\]$' "$SCRATCH/run2.log"
 assert "all-green console summary omits zero values" \
   grep -q '^codex:execute: summary: feature=feat-y base=main tasks=1 pass=1 merged=1 post-merge=pass reviewed pushed$' "$SCRATCH/run2.log"
 
+# ---------- scenario 3: red post-merge check restores the session branch ----------
+printf 'TASK-D write d.txt\nTASK-E write e.txt\n' > "$FIX/tasks3.txt"
+git -C "$FIX" add tasks3.txt && git -C "$FIX" commit -qm "tasks3" && git -C "$FIX" push -q origin main
+PRE3="$(git -C "$FIX" rev-parse main)"
+ORIGIN3="$(git -C "$ORIGIN" rev-parse main)"
+set +e
+"$ENGINE" --tasks "$FIX/tasks3.txt" --feature feat-z \
+  --check "sh ./check.sh" --concurrency 2 --retries 0 --timeout 3 \
+  --repo "$FIX" > "$SCRATCH/run3.log" 2>&1
+RC3=$?
+set -e 2>/dev/null || true
+echo "---- scenario 3 exit=$RC3 (log: $SCRATCH/run3.log) ----"
+
+assert_eq "red post-merge exits 1" 1 "$RC3"
+assert_eq "session branch restored to pre-merge commit" "$PRE3" "$(git -C "$FIX" rev-parse main)"
+assert "restored worktree has no d.txt" test ! -e "$FIX/d.txt"
+assert "restored worktree has no e.txt" test ! -e "$FIX/e.txt"
+assert_eq "both task branches kept for autopsy" 2 \
+  "$(git -C "$FIX" branch --list 'tasks/feat-z/*' | wc -l | tr -d ' ')"
+assert "restore is reported" \
+  grep -q 'session branch restored' "$SCRATCH/run3.log"
+assert "restored summary token present" \
+  sh -c "grep -q 'post-merge=fail restored' '$SCRATCH/run3.log'"
+assert_eq "origin main untouched by red run" "$ORIGIN3" "$(git -C "$ORIGIN" rev-parse main)"
+ST3="$(git -C "$FIX" rev-parse --absolute-git-dir)/codex-execute/feat-z/status"
+assert "summary records the restore" grep -q '"restored": true' "$ST3/summary.json"
+assert_eq "no review on red post-merge" 2 "$(count REVIEW)"
+git -C "$FIX" branch -q -D tasks/feat-z/1 tasks/feat-z/2
+
+# ---------- scenario 4: guard rails ----------
+echo dirt > "$FIX/dirty.txt"
+set +e
+"$ENGINE" --tasks "$FIX/tasks2.txt" --feature feat-w \
+  --check "sh ./check.sh" --repo "$FIX" > "$SCRATCH/run4.log" 2>&1
+RC4=$?
+set -e 2>/dev/null || true
+rm -f "$FIX/dirty.txt"
+
+assert_eq "dirty session worktree is fatal" 1 "$RC4"
+assert "dirty guard names the problem" \
+  grep -q 'session worktree is dirty' "$SCRATCH/run4.log"
+assert_eq "dirty run created no task branches" 0 \
+  "$(git -C "$FIX" branch --list 'tasks/feat-w/*' | wc -l | tr -d ' ')"
+
+set +e
+"$ENGINE" --tasks "$FIX/tasks2.txt" --base other --feature feat-v \
+  --check "sh ./check.sh" --repo "$FIX" > "$SCRATCH/run5.log" 2>&1
+RC5=$?
+set -e 2>/dev/null || true
+
+assert_eq "base/checkout mismatch is fatal" 1 "$RC5"
+assert "mismatch guard names both branches" \
+  sh -c "grep -q \"repo has 'main' checked out but --base is 'other'\" '$SCRATCH/run5.log'"
+
 echo
-if [ "$FAILS" -eq 0 ]; then echo "ALL TESTS PASSED"; else echo "$FAILS TEST(S) FAILED"; tail -40 "$SCRATCH/run.log"; echo "-- run2 --"; tail -30 "$SCRATCH/run2.log"; exit 1; fi
+if [ "$FAILS" -eq 0 ]; then echo "ALL TESTS PASSED"; else echo "$FAILS TEST(S) FAILED"; tail -40 "$SCRATCH/run.log"; echo "-- run3 --"; tail -30 "$SCRATCH/run3.log"; exit 1; fi

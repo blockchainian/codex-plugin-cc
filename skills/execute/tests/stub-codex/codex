@@ -65,6 +65,14 @@ case "$PROMPT" in
     bump TASK-C2; log TASK-C2
     echo "ok-task6" > "$DIR/c.txt"
     ;;
+  *TASK-D*)
+    bump TASK-D; log TASK-D
+    echo "ok-d" > "$DIR/d.txt"
+    ;;
+  *TASK-E*)
+    bump TASK-E; log TASK-E
+    echo "ok-e" > "$DIR/e.txt"
+    ;;
   *)
     bump UNKNOWN; log "UNKNOWN prompt=$PROMPT"
     exit 1
