@@ -116,9 +116,11 @@ Task: $LINE"
     a=$((a+1))
     attempt_prefix=""
     attempt_suffix=""
+    start_attempt=""
     if [ "$a" -gt 1 ]; then
       attempt_prefix="attempt $a "
       attempt_suffix=" (attempt $a)"
+      start_attempt=" attempt $a"
     fi
     PROMPT="$PREAMBLE"
     if [ "$a" -gt 1 ]; then
@@ -128,7 +130,7 @@ PREVIOUS ATTEMPT FAILED (attempt $((a-1)) of $((RETRIES+1))): $reason
 $failctx
 Fix it."
     fi
-    note "[task $idx] ${attempt_prefix}starting (slot w$SLOT)"
+    note "[task $idx] starting${start_attempt} (slot w$SLOT)"
     timeout "$TIMEOUT_S" "$CODEX" exec -C "$WT" -s workspace-write --ephemeral \
       -o "$LOGD/task-$idx-a$a.last" "$PROMPT" > "$LOGD/task-$idx-a$a.codex.log" 2>&1
     rc=$?
@@ -156,7 +158,7 @@ Fix it."
       break
     fi
     reason="check-failed"; failctx="$(tail -c 3000 "$LOGD/task-$idx-a$a.check.log")"
-    note "[task $idx] ${attempt_prefix}red: check failed (exit $crc)"
+    note "[task $idx] ${attempt_prefix}check FAIL (exit $crc)"
   done
 
   if [ "$result" != "pass" ]; then
@@ -227,8 +229,8 @@ while [ "$i" -le "$N" ]; do
   fi
   i=$((i+1))
 done
-EXECUTION_SUMMARY="passed[${PASSED# }]"
-[ -n "$FAILED" ] && EXECUTION_SUMMARY="$EXECUTION_SUMMARY failed[${FAILED# }]"
+EXECUTION_SUMMARY="PASS [${PASSED# }]"
+[ -n "$FAILED" ] && EXECUTION_SUMMARY="$EXECUTION_SUMMARY FAIL [${FAILED# }]"
 note "$EXECUTION_SUMMARY"
 
 # ---------- phase: merge ----------
@@ -264,7 +266,7 @@ done
 POST="skip"
 if [ -n "$MERGED" ]; then
   if (cd "$FT" && eval "$CHECK") > "$RUN_DIR/logs/post-merge-check.log" 2>&1; then
-    POST="pass"; note "[merge] post-merge check green"
+    POST="pass"; note "[merge] post-merge check PASS"
   else
     POST="fail"; note "[merge] post-merge check RED (log: $RUN_DIR/logs/post-merge-check.log)"
   fi
