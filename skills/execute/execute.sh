@@ -158,7 +158,7 @@ Fix it."
       break
     fi
     reason="check-failed"; failctx="$(tail -c 3000 "$LOGD/task-$idx-a$a.check.log")"
-    note "[task $idx] ${attempt_prefix}check FAIL (exit $crc)"
+    note "[task $idx] ${attempt_prefix}FAIL (exit $crc)"
   done
 
   if [ "$result" != "pass" ]; then
@@ -267,7 +267,7 @@ done
 POST="skip"
 if [ -n "$MERGED" ]; then
   if (cd "$FT" && eval "$CHECK") > "$RUN_DIR/logs/post-merge-check.log" 2>&1; then
-    POST="pass"; note "[merge] check PASS"
+    POST="pass"; note "[merge] PASS"
   else
     POST="fail"; note "[merge] post-merge check RED (log: $RUN_DIR/logs/post-merge-check.log)"
   fi

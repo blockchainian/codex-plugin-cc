@@ -114,13 +114,13 @@ assert_eq "first attempts omit attempt number" 0 "$(grep -c 'attempt 1' "$SCRATC
 assert "retry start appends attempt number" \
   grep -Eq '\[task 2\] starting \(slot w[12]\) \(attempt 2\)' "$SCRATCH/run.log"
 assert "retry pass includes attempt number" grep -q '\[task 2\] PASS (attempt 2)' "$SCRATCH/run.log"
-assert "check failure uses concise FAIL output" grep -q '\[task 2\] check FAIL (exit 1)' "$SCRATCH/run.log"
+assert "check failure uses concise FAIL output" grep -q '\[task 2\] FAIL (exit 1)' "$SCRATCH/run.log"
 assert "summary includes passed and failed tasks" \
   grep -q '^codex:execute: PASS \[1 2 5 6\] FAIL \[3 4\]$' "$SCRATCH/run.log"
 assert "successful merge uses uppercase status" \
   grep -q '^codex:execute: \[merge\] task 1 MERGED$' "$SCRATCH/run.log"
-assert "merge check uses concise PASS output" \
-  grep -q '^codex:execute: \[merge\] check PASS$' "$SCRATCH/run.log"
+assert "merge uses concise PASS output" \
+  grep -q '^codex:execute: \[merge\] PASS$' "$SCRATCH/run.log"
 assert "PR output is concise" \
   grep -q '^codex:execute: PR is https://github.com/example/app/pull/42$' "$SCRATCH/run.log"
 assert "GitHub review output is concise" \
