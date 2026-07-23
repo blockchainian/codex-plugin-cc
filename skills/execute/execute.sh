@@ -199,6 +199,7 @@ fi
 GITDIR="$(git -C "$REPO" rev-parse --absolute-git-dir)"
 RUN_DIR="$GITDIR/codex-execute/$FEATURE"
 WT_ROOT="$(dirname "$REPO")/.codex-execute-$FEATURE"
+FT="$WT_ROOT/feature"
 rm -rf "$RUN_DIR"
 mkdir -p "$RUN_DIR/logs" "$RUN_DIR/status" "$RUN_DIR/locks" "$WT_ROOT"
 
@@ -209,6 +210,7 @@ N="$(wc -l < "$RUN_DIR/tasks.txt" | tr -d ' ')"
 
 note "feature=$FEATURE base=$BASE tasks=$N pool=$CONCURRENCY retries=$RETRIES timeout=${TIMEOUT_S}s"
 note "logs: $RUN_DIR/logs  status: $RUN_DIR/status"
+note "worktree: $FT"
 
 SELF="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
 export EXECUTE_REPO="$REPO" EXECUTE_BASE="$BASE" EXECUTE_FEATURE="$FEATURE" EXECUTE_CHECK="$CHECK"
@@ -234,7 +236,6 @@ EXECUTION_SUMMARY="PASS [${PASSED# }]"
 note "$EXECUTION_SUMMARY"
 
 # ---------- phase: merge ----------
-FT="$WT_ROOT/feature"
 git -C "$REPO" worktree add -q "$FT" -b "$FEATURE" "$BASE" || fatal "cannot create feature worktree"
 
 MERGED=""; MERGE_FAILED=""
@@ -369,8 +370,6 @@ case "$REVIEW" in
 esac
 [ "$PUSHED" = "true" ] && SUMMARY="$SUMMARY pushed"
 note "summary: $SUMMARY"
-[ -d "$FT" ] && note "worktree: $FT"
-[ "$REVIEW" = "done" ] && note "review result: $RUN_DIR/logs/review.md"
 
 if [ "$POST" = "fail" ]; then exit 1; fi
 if [ "$PUSH" = "1" ] && [ "$POST" = "pass" ] && [ "$PUSHED" != "true" ]; then exit 1; fi

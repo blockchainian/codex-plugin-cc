@@ -135,8 +135,10 @@ assert "push output omits the feature name" \
   grep -q '^codex:execute: pushed to origin$' "$SCRATCH/run.log"
 assert "worktree output uses concise label" \
   grep -q "^codex:execute: worktree: $FT$" "$SCRATCH/run.log"
-assert "final review output uses result label" \
-  grep -q '^codex:execute: review result: .*/logs/review.md$' "$SCRATCH/run.log"
+assert "worktree output precedes task progress" \
+  awk '/^codex:execute: worktree:/{worktree=NR} /^codex:execute: \[task/{task=NR; exit} END {exit !(worktree && task && worktree < task)}' "$SCRATCH/run.log"
+assert_eq "review result is not repeated at the end" 0 \
+  "$(grep -c '^codex:execute: review result:' "$SCRATCH/run.log" || true)"
 
 # task worktrees cleaned, feature worktree kept
 assert "task worktree w1 removed" test ! -e "$WT_ROOT/w1"
