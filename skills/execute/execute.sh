@@ -266,7 +266,7 @@ done
 POST="skip"
 if [ -n "$MERGED" ]; then
   if (cd "$FT" && eval "$CHECK") > "$RUN_DIR/logs/post-merge-check.log" 2>&1; then
-    POST="pass"; note "[merge] post-merge check PASS"
+    POST="pass"; note "[merge] check PASS"
   else
     POST="fail"; note "[merge] post-merge check RED (log: $RUN_DIR/logs/post-merge-check.log)"
   fi

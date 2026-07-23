@@ -117,8 +117,8 @@ assert "check failure uses concise FAIL output" grep -q '\[task 2\] check FAIL (
 assert "summary includes passed and failed tasks" \
   grep -q '^codex:execute: PASS \[1 2 5 6\] FAIL \[3 4\]$' "$SCRATCH/run.log"
 assert_eq "clean merge output omits clean suffix" 0 "$(grep -c 'merged clean' "$SCRATCH/run.log" || true)"
-assert "post-merge check uses PASS output" \
-  grep -q '^codex:execute: \[merge\] post-merge check PASS$' "$SCRATCH/run.log"
+assert "merge check uses concise PASS output" \
+  grep -q '^codex:execute: \[merge\] check PASS$' "$SCRATCH/run.log"
 assert "PR output is concise" \
   grep -q '^codex:execute: PR https://github.com/example/app/pull/42$' "$SCRATCH/run.log"
 assert "GitHub review output is concise" \
