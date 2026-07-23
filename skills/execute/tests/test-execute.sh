@@ -135,8 +135,8 @@ assert "push output omits the feature name" \
   grep -q '^codex:execute: pushed to origin$' "$SCRATCH/run.log"
 assert "worktree output uses concise label" \
   grep -q "^codex:execute: worktree: $FT$" "$SCRATCH/run.log"
-assert "worktree output precedes task progress" \
-  awk '/^codex:execute: worktree:/{worktree=NR} /^codex:execute: \[task/{task=NR; exit} END {exit !(worktree && task && worktree < task)}' "$SCRATCH/run.log"
+assert "worktree output precedes logs" \
+  awk '/^codex:execute: worktree:/{worktree=NR} /^codex:execute: logs:/{logs=NR} END {exit !(worktree && logs && worktree < logs)}' "$SCRATCH/run.log"
 assert_eq "review result is not repeated at the end" 0 \
   "$(grep -c '^codex:execute: review result:' "$SCRATCH/run.log" || true)"
 

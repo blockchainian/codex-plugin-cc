@@ -209,8 +209,8 @@ N="$(wc -l < "$RUN_DIR/tasks.txt" | tr -d ' ')"
 [ "$CONCURRENCY" -gt "$N" ] && CONCURRENCY="$N"
 
 note "feature=$FEATURE base=$BASE tasks=$N pool=$CONCURRENCY retries=$RETRIES timeout=${TIMEOUT_S}s"
-note "logs: $RUN_DIR/logs  status: $RUN_DIR/status"
 note "worktree: $FT"
+note "logs: $RUN_DIR/logs  status: $RUN_DIR/status"
 
 SELF="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
 export EXECUTE_REPO="$REPO" EXECUTE_BASE="$BASE" EXECUTE_FEATURE="$FEATURE" EXECUTE_CHECK="$CHECK"
