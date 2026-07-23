@@ -101,6 +101,9 @@ assert_eq "merge conflict resolved via codex exactly once" 1 "$(count MERGE-RESO
 assert_eq "first attempts omit attempt number" 0 "$(grep -c 'attempt 1' "$SCRATCH/run.log" || true)"
 assert "retry start includes attempt number" grep -q '\[task 2\] attempt 2 starting' "$SCRATCH/run.log"
 assert "retry pass includes attempt number" grep -q '\[task 2\] PASS (attempt 2)' "$SCRATCH/run.log"
+assert "summary includes passed and failed tasks" \
+  grep -q '^codex:execute: passed\[1 2 5 6\] failed\[3 4\]$' "$SCRATCH/run.log"
+assert_eq "clean merge output omits clean suffix" 0 "$(grep -c 'merged clean' "$SCRATCH/run.log" || true)"
 
 # task worktrees cleaned, feature worktree kept
 assert "task worktree w1 removed" test ! -e "$WT_ROOT/w1"
@@ -147,6 +150,8 @@ assert "local feat-y branch deleted after delivery" \
   sh -c "! git -C '$FIX' rev-parse --verify -q refs/heads/feat-y"
 assert "feat-y worktree root fully removed" test ! -e "$(dirname "$FIX")/.codex-execute-feat-y"
 assert_eq "review also ran for onto-base run" 2 "$(count REVIEW)"
+assert "all-green summary only includes passed tasks" \
+  grep -q '^codex:execute: passed\[1\]$' "$SCRATCH/run2.log"
 
 echo
 if [ "$FAILS" -eq 0 ]; then echo "ALL TESTS PASSED"; else echo "$FAILS TEST(S) FAILED"; tail -40 "$SCRATCH/run.log"; echo "-- run2 --"; tail -30 "$SCRATCH/run2.log"; exit 1; fi

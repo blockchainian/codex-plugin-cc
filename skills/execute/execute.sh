@@ -227,7 +227,9 @@ while [ "$i" -le "$N" ]; do
   fi
   i=$((i+1))
 done
-note "execute done: passed:[${PASSED# }] failed:[${FAILED# }]"
+EXECUTION_SUMMARY="passed[${PASSED# }]"
+[ -n "$FAILED" ] && EXECUTION_SUMMARY="$EXECUTION_SUMMARY failed[${FAILED# }]"
+note "$EXECUTION_SUMMARY"
 
 # ---------- phase: merge ----------
 FT="$WT_ROOT/feature"
@@ -238,7 +240,7 @@ for idx in $PASSED; do
   BR="tasks/$FEATURE/$idx"
   if git -C "$FT" merge -q --no-ff -m "merge task $idx" "$BR" > "$RUN_DIR/logs/merge-$idx.log" 2>&1; then
     MERGED="$MERGED $idx"
-    note "[merge] task $idx merged clean"
+    note "[merge] task $idx merged"
     continue
   fi
   CONFLICTED="$(git -C "$FT" diff --name-only --diff-filter=U | tr '\n' ' ')"
