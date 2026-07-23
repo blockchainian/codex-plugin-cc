@@ -312,7 +312,7 @@ if [ "$POST" = "pass" ] && [ "$PUSH" = "1" ]; then
       PUSHED=true; DELIVERED="$BASE"
       note "pushed tasks onto origin/$BASE (existing PR for $BASE updates)"
       if gh pr comment "$BASE" --body "@codex review" > "$RUN_DIR/logs/pr.log" 2>&1; then
-        note "bonus: codex GitHub app review requested on $BASE's PR"
+        note "GitHub review requested"
       else
         note "no @codex comment posted (no open PR for $BASE, or gh failed)"
       fi
@@ -330,9 +330,9 @@ if [ "$POST" = "pass" ] && [ "$PUSH" = "1" ]; then
 🤖 Generated with [Claude Code](https://claude.com/claude-code)"
       if gh pr create --head "$FEATURE" --base "$BASE" \
            --title "execute: $FEATURE" --body "$BODY" > "$RUN_DIR/logs/pr.log" 2>&1; then
-        note "PR opened: $(tail -1 "$RUN_DIR/logs/pr.log")"
+        note "PR $(tail -1 "$RUN_DIR/logs/pr.log")"
         if gh pr comment "$FEATURE" --body "@codex review" >> "$RUN_DIR/logs/pr.log" 2>&1; then
-          note "bonus: codex GitHub app review requested (@codex review)"
+          note "GitHub review requested"
         else
           note "no @codex comment posted (gh failed); local review already ran"
         fi
@@ -354,7 +354,21 @@ for x in $MERGE_FAILED; do NMF=$((NMF+1)); done
 printf '{"feature": "%s", "base": "%s", "tasks": %s, "passed": %s, "failed": %s, "merged": %s, "merge_failed": %s, "post_merge_check": "%s", "review": "%s", "pushed": %s, "delivered_to": "%s"}\n' \
   "$FEATURE" "$BASE" "$N" "$NP" "$NF" "$NM" "$NMF" "$POST" "$REVIEW" "$PUSHED" "$DELIVERED" \
   > "$RUN_DIR/status/summary.json"
-note "summary: $(cat "$RUN_DIR/status/summary.json")"
+SUMMARY="feature=$FEATURE base=$BASE tasks=$N"
+[ "$NP" -gt 0 ] && SUMMARY="$SUMMARY PASS=$NP"
+[ "$NF" -gt 0 ] && SUMMARY="$SUMMARY FAIL=$NF"
+[ "$NM" -gt 0 ] && SUMMARY="$SUMMARY merged=$NM"
+[ "$NMF" -gt 0 ] && SUMMARY="$SUMMARY merge=FAIL"
+case "$POST" in
+  pass) SUMMARY="$SUMMARY post_merge=PASS" ;;
+  fail) SUMMARY="$SUMMARY post_merge=FAIL" ;;
+esac
+case "$REVIEW" in
+  done) SUMMARY="$SUMMARY review=DONE" ;;
+  failed) SUMMARY="$SUMMARY review=FAILED" ;;
+esac
+[ "$PUSHED" = "true" ] && SUMMARY="$SUMMARY pushed"
+note "summary: $SUMMARY"
 [ -d "$FT" ] && note "feature worktree: $FT"
 [ "$REVIEW" = "done" ] && note "review findings: $RUN_DIR/logs/review.md"
 

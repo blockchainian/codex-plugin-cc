@@ -32,6 +32,18 @@ export STUB_DIR="$SCRATCH/stub"
 mkdir -p "$STUB_DIR"
 # inject the stub via EXECUTE_CODEX: a single path, immune to PATH quirks (e.g. colons in dir names)
 export EXECUTE_CODEX="$HERE/stub-codex/codex"
+STUB_BIN="$SCRATCH/bin"
+mkdir -p "$STUB_BIN"
+cat > "$STUB_BIN/gh" <<'EOF'
+#!/bin/sh
+case "$1 $2" in
+  "pr create") echo "https://github.com/example/app/pull/42" ;;
+  "pr comment") ;;
+  *) exit 1 ;;
+esac
+EOF
+chmod +x "$STUB_BIN/gh"
+export PATH="$STUB_BIN:$PATH"
 
 FIX="$SCRATCH/repo"
 ORIGIN="$SCRATCH/origin.git"
@@ -107,6 +119,12 @@ assert "summary includes passed and failed tasks" \
 assert_eq "clean merge output omits clean suffix" 0 "$(grep -c 'merged clean' "$SCRATCH/run.log" || true)"
 assert "post-merge check uses PASS output" \
   grep -q '^codex:execute: \[merge\] post-merge check PASS$' "$SCRATCH/run.log"
+assert "PR output is concise" \
+  grep -q '^codex:execute: PR https://github.com/example/app/pull/42$' "$SCRATCH/run.log"
+assert "GitHub review output is concise" \
+  grep -q '^codex:execute: GitHub review requested$' "$SCRATCH/run.log"
+assert "console summary uses compact fields" \
+  grep -q '^codex:execute: summary: feature=feat-x base=main tasks=6 PASS=4 FAIL=2 merged=4 post_merge=PASS review=DONE pushed$' "$SCRATCH/run.log"
 
 # task worktrees cleaned, feature worktree kept
 assert "task worktree w1 removed" test ! -e "$WT_ROOT/w1"
@@ -155,6 +173,8 @@ assert "feat-y worktree root fully removed" test ! -e "$(dirname "$FIX")/.codex-
 assert_eq "review also ran for onto-base run" 2 "$(count REVIEW)"
 assert "all-green summary only includes passed tasks" \
   grep -q '^codex:execute: PASS \[1\]$' "$SCRATCH/run2.log"
+assert "all-green console summary omits zero values" \
+  grep -q '^codex:execute: summary: feature=feat-y base=main tasks=1 PASS=1 merged=1 post_merge=PASS review=DONE pushed$' "$SCRATCH/run2.log"
 
 echo
 if [ "$FAILS" -eq 0 ]; then echo "ALL TESTS PASSED"; else echo "$FAILS TEST(S) FAILED"; tail -40 "$SCRATCH/run.log"; echo "-- run2 --"; tail -30 "$SCRATCH/run2.log"; exit 1; fi
