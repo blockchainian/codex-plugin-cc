@@ -120,7 +120,7 @@ Task: $LINE"
     if [ "$a" -gt 1 ]; then
       attempt_prefix="attempt $a "
       attempt_suffix=" (attempt $a)"
-      start_attempt=" attempt $a"
+      start_attempt=" (attempt $a)"
     fi
     PROMPT="$PREAMBLE"
     if [ "$a" -gt 1 ]; then
@@ -130,7 +130,7 @@ PREVIOUS ATTEMPT FAILED (attempt $((a-1)) of $((RETRIES+1))): $reason
 $failctx
 Fix it."
     fi
-    note "[task $idx] starting${start_attempt} (slot w$SLOT)"
+    note "[task $idx] starting (slot w$SLOT)${start_attempt}"
     timeout "$TIMEOUT_S" "$CODEX" exec -C "$WT" -s workspace-write --ephemeral \
       -o "$LOGD/task-$idx-a$a.last" "$PROMPT" > "$LOGD/task-$idx-a$a.codex.log" 2>&1
     rc=$?
@@ -242,7 +242,7 @@ for idx in $PASSED; do
   BR="tasks/$FEATURE/$idx"
   if git -C "$FT" merge -q --no-ff -m "merge task $idx" "$BR" > "$RUN_DIR/logs/merge-$idx.log" 2>&1; then
     MERGED="$MERGED $idx"
-    note "[merge] task $idx merged"
+    note "[merge] task $idx MERGED"
     continue
   fi
   CONFLICTED="$(git -C "$FT" diff --name-only --diff-filter=U | tr '\n' ' ')"
@@ -254,7 +254,7 @@ Read ${SPEC:-spec.md at the repo root, if present,} for intent. Resolve every co
   if [ -z "$(git -C "$FT" diff --name-only --diff-filter=U)" ] \
      && git -C "$FT" commit -q --no-edit >> "$RUN_DIR/logs/merge-$idx.log" 2>&1; then
     MERGED="$MERGED $idx"
-    note "[merge] task $idx merged (conflict resolved)"
+    note "[merge] task $idx MERGED (conflict resolved)"
   else
     git -C "$FT" merge --abort >> "$RUN_DIR/logs/merge-$idx.log" 2>&1
     MERGE_FAILED="$MERGE_FAILED $idx"
@@ -295,10 +295,10 @@ done
 # ---------- review (local codex review of the integrated diff) ----------
 REVIEW="skip"
 if [ "$POST" = "pass" ]; then
-  note "[review] running codex review of $FEATURE vs $BASE"
+  note "[review] reviewing $FEATURE vs $BASE"
   if timeout "$TIMEOUT_S" "$CODEX" exec -C "$FT" -o "$RUN_DIR/logs/review.md" \
        review --base "$BASE" > "$RUN_DIR/logs/review.log" 2>&1; then
-    REVIEW="done"; note "[review] findings: $RUN_DIR/logs/review.md"
+    REVIEW="done"; note "[review] result: $RUN_DIR/logs/review.md"
   else
     REVIEW="failed"; note "[review] codex review failed (see $RUN_DIR/logs/review.log)"
   fi
@@ -324,13 +324,13 @@ if [ "$POST" = "pass" ] && [ "$PUSH" = "1" ]; then
     fi
   else
     if git -C "$FT" push -q -u origin "$FEATURE" > "$RUN_DIR/logs/push.log" 2>&1; then
-      PUSHED=true; DELIVERED="$FEATURE"; note "pushed $FEATURE to origin"
+      PUSHED=true; DELIVERED="$FEATURE"; note "pushed to origin"
       BODY="codex:execute run: $N tasks, passed:[${PASSED# }] failed:[${FAILED# }] merge-failed:[${MERGE_FAILED# }]. Post-merge check: $POST. Codex review: $REVIEW (findings in run logs).
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)"
       if gh pr create --head "$FEATURE" --base "$BASE" \
            --title "execute: $FEATURE" --body "$BODY" > "$RUN_DIR/logs/pr.log" 2>&1; then
-        note "PR $(tail -1 "$RUN_DIR/logs/pr.log")"
+        note "PR is $(tail -1 "$RUN_DIR/logs/pr.log")"
         if gh pr comment "$FEATURE" --body "@codex review" >> "$RUN_DIR/logs/pr.log" 2>&1; then
           note "GitHub review requested"
         else
@@ -355,22 +355,22 @@ printf '{"feature": "%s", "base": "%s", "tasks": %s, "passed": %s, "failed": %s,
   "$FEATURE" "$BASE" "$N" "$NP" "$NF" "$NM" "$NMF" "$POST" "$REVIEW" "$PUSHED" "$DELIVERED" \
   > "$RUN_DIR/status/summary.json"
 SUMMARY="feature=$FEATURE base=$BASE tasks=$N"
-[ "$NP" -gt 0 ] && SUMMARY="$SUMMARY PASS=$NP"
-[ "$NF" -gt 0 ] && SUMMARY="$SUMMARY FAIL=$NF"
+[ "$NP" -gt 0 ] && SUMMARY="$SUMMARY pass=$NP"
+[ "$NF" -gt 0 ] && SUMMARY="$SUMMARY fail=$NF"
 [ "$NM" -gt 0 ] && SUMMARY="$SUMMARY merged=$NM"
-[ "$NMF" -gt 0 ] && SUMMARY="$SUMMARY merge=FAIL"
+[ "$NMF" -gt 0 ] && SUMMARY="$SUMMARY merge=fail"
 case "$POST" in
-  pass) SUMMARY="$SUMMARY post_merge=PASS" ;;
-  fail) SUMMARY="$SUMMARY post_merge=FAIL" ;;
+  pass) SUMMARY="$SUMMARY post-merge=pass" ;;
+  fail) SUMMARY="$SUMMARY post-merge=fail" ;;
 esac
 case "$REVIEW" in
-  done) SUMMARY="$SUMMARY review=DONE" ;;
-  failed) SUMMARY="$SUMMARY review=FAILED" ;;
+  done) SUMMARY="$SUMMARY reviewed" ;;
+  failed) SUMMARY="$SUMMARY review=failed" ;;
 esac
 [ "$PUSHED" = "true" ] && SUMMARY="$SUMMARY pushed"
 note "summary: $SUMMARY"
-[ -d "$FT" ] && note "feature worktree: $FT"
-[ "$REVIEW" = "done" ] && note "review findings: $RUN_DIR/logs/review.md"
+[ -d "$FT" ] && note "worktree: $FT"
+[ "$REVIEW" = "done" ] && note "review result: $RUN_DIR/logs/review.md"
 
 if [ "$POST" = "fail" ]; then exit 1; fi
 if [ "$PUSH" = "1" ] && [ "$POST" = "pass" ] && [ "$PUSHED" != "true" ]; then exit 1; fi

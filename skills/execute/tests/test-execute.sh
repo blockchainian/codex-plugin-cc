@@ -111,20 +111,32 @@ assert_eq "merge conflict resolved via codex exactly once" 1 "$(count MERGE-RESO
 
 # progress output
 assert_eq "first attempts omit attempt number" 0 "$(grep -c 'attempt 1' "$SCRATCH/run.log" || true)"
-assert "retry start includes attempt number" grep -q '\[task 2\] starting attempt 2' "$SCRATCH/run.log"
+assert "retry start appends attempt number" \
+  grep -Eq '\[task 2\] starting \(slot w[12]\) \(attempt 2\)' "$SCRATCH/run.log"
 assert "retry pass includes attempt number" grep -q '\[task 2\] PASS (attempt 2)' "$SCRATCH/run.log"
 assert "check failure uses concise FAIL output" grep -q '\[task 2\] check FAIL (exit 1)' "$SCRATCH/run.log"
 assert "summary includes passed and failed tasks" \
   grep -q '^codex:execute: PASS \[1 2 5 6\] FAIL \[3 4\]$' "$SCRATCH/run.log"
-assert_eq "clean merge output omits clean suffix" 0 "$(grep -c 'merged clean' "$SCRATCH/run.log" || true)"
+assert "successful merge uses uppercase status" \
+  grep -q '^codex:execute: \[merge\] task 1 MERGED$' "$SCRATCH/run.log"
 assert "merge check uses concise PASS output" \
   grep -q '^codex:execute: \[merge\] check PASS$' "$SCRATCH/run.log"
 assert "PR output is concise" \
-  grep -q '^codex:execute: PR https://github.com/example/app/pull/42$' "$SCRATCH/run.log"
+  grep -q '^codex:execute: PR is https://github.com/example/app/pull/42$' "$SCRATCH/run.log"
 assert "GitHub review output is concise" \
   grep -q '^codex:execute: GitHub review requested$' "$SCRATCH/run.log"
 assert "console summary uses compact fields" \
-  grep -q '^codex:execute: summary: feature=feat-x base=main tasks=6 PASS=4 FAIL=2 merged=4 post_merge=PASS review=DONE pushed$' "$SCRATCH/run.log"
+  grep -q '^codex:execute: summary: feature=feat-x base=main tasks=6 pass=4 fail=2 merged=4 post-merge=pass reviewed pushed$' "$SCRATCH/run.log"
+assert "review progress uses concise wording" \
+  grep -q '^codex:execute: \[review\] reviewing feat-x vs main$' "$SCRATCH/run.log"
+assert "review result identifies the result file" \
+  grep -q '^codex:execute: \[review\] result: .*/logs/review.md$' "$SCRATCH/run.log"
+assert "push output omits the feature name" \
+  grep -q '^codex:execute: pushed to origin$' "$SCRATCH/run.log"
+assert "worktree output uses concise label" \
+  grep -q "^codex:execute: worktree: $FT$" "$SCRATCH/run.log"
+assert "final review output uses result label" \
+  grep -q '^codex:execute: review result: .*/logs/review.md$' "$SCRATCH/run.log"
 
 # task worktrees cleaned, feature worktree kept
 assert "task worktree w1 removed" test ! -e "$WT_ROOT/w1"
@@ -174,7 +186,7 @@ assert_eq "review also ran for onto-base run" 2 "$(count REVIEW)"
 assert "all-green summary only includes passed tasks" \
   grep -q '^codex:execute: PASS \[1\]$' "$SCRATCH/run2.log"
 assert "all-green console summary omits zero values" \
-  grep -q '^codex:execute: summary: feature=feat-y base=main tasks=1 PASS=1 merged=1 post_merge=PASS review=DONE pushed$' "$SCRATCH/run2.log"
+  grep -q '^codex:execute: summary: feature=feat-y base=main tasks=1 pass=1 merged=1 post-merge=pass reviewed pushed$' "$SCRATCH/run2.log"
 
 echo
 if [ "$FAILS" -eq 0 ]; then echo "ALL TESTS PASSED"; else echo "$FAILS TEST(S) FAILED"; tail -40 "$SCRATCH/run.log"; echo "-- run2 --"; tail -30 "$SCRATCH/run2.log"; exit 1; fi
