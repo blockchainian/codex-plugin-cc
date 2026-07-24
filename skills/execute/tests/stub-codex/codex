@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# ABOUTME: Test stand-in for the codex CLI. Reads the task marker embedded in the prompt and
-# ABOUTME: simulates pass / fail-once / hang / no-op / conflicting tasks plus merge resolution.
+# ABOUTME: Test stand-in for the codex CLI. Reads the workstream marker embedded in the prompt and
+# ABOUTME: simulates pass / fail-once / hang / no-op / conflicting workstreams plus merge resolution.
 set -u
 
 DIR=.
@@ -39,38 +39,38 @@ case "$PROMPT" in
     echo "ok-merged" > "$DIR/c.txt"
     git -C "$DIR" add c.txt
     ;;
-  *TASK-OK*)
-    bump TASK-OK; log TASK-OK
-    echo "ok-task1" > "$DIR/a.txt"
+  *WS-OK*)
+    bump WS-OK; log WS-OK
+    echo "ok-ws1" > "$DIR/a.txt"
     ;;
-  *TASK-FAILONCE*)
-    bump TASK-FAILONCE; log TASK-FAILONCE
+  *WS-FAILONCE*)
+    bump WS-FAILONCE; log WS-FAILONCE
     case "$PROMPT" in
-      *"PREVIOUS ATTEMPT FAILED"*) echo "ok-task2" > "$DIR/b.txt" ;;
+      *"PREVIOUS ATTEMPT FAILED"*) echo "ok-ws2" > "$DIR/b.txt" ;;
       *) echo "bad" > "$DIR/b.txt" ;;
     esac
     ;;
-  *TASK-HANG*)
-    bump TASK-HANG; log TASK-HANG
+  *WS-HANG*)
+    bump WS-HANG; log WS-HANG
     sleep 30
     ;;
-  *TASK-NOOP*)
-    bump TASK-NOOP; log TASK-NOOP
+  *WS-NOOP*)
+    bump WS-NOOP; log WS-NOOP
     ;;
-  *TASK-C1*)
-    bump TASK-C1; log TASK-C1
-    echo "ok-task5" > "$DIR/c.txt"
+  *WS-C1*)
+    bump WS-C1; log WS-C1
+    echo "ok-ws5" > "$DIR/c.txt"
     ;;
-  *TASK-C2*)
-    bump TASK-C2; log TASK-C2
-    echo "ok-task6" > "$DIR/c.txt"
+  *WS-C2*)
+    bump WS-C2; log WS-C2
+    echo "ok-ws6" > "$DIR/c.txt"
     ;;
-  *TASK-D*)
-    bump TASK-D; log TASK-D
+  *WS-D*)
+    bump WS-D; log WS-D
     echo "ok-d" > "$DIR/d.txt"
     ;;
-  *TASK-E*)
-    bump TASK-E; log TASK-E
+  *WS-E*)
+    bump WS-E; log WS-E
     echo "ok-e" > "$DIR/e.txt"
     ;;
   *)

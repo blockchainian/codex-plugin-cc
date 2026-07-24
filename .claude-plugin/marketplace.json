@@ -4,14 +4,14 @@
     "name": "blockchainian"
   },
   "metadata": {
-    "description": "Claude Code plugin marketplace for blockchainian's plugins: Grok and Codex review/task-delegation tooling.",
-    "version": "0.3.0"
+    "description": "Claude Code plugin marketplace for blockchainian's plugins: Grok and Codex review/delegation tooling.",
+    "version": "0.4.0"
   },
   "plugins": [
     {
       "name": "codex",
-      "description": "Execute a planned feature as parallel codex tasks off Claude's critical path \u2014 delivered onto your session branch, codex-reviewed, pushed.",
-      "version": "0.3.0",
+      "description": "Execute a planned feature as parallel codex workstreams off Claude's critical path \u2014 delivered onto your session branch, codex-reviewed, pushed.",
+      "version": "0.4.0",
       "author": {
         "name": "blockchainian"
       },
