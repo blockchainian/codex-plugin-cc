@@ -21,7 +21,7 @@ const STREAMING_METHODS = new Set(["turn/start", "review/start", "thread/compact
 // dead-co-owner orphan, and the lock-contention skip in one mechanism. See #108,
 // #380, and #450.
 const IDLE_TIMEOUT_ENV = "CODEX_COMPANION_BROKER_IDLE_TIMEOUT_MS";
-const DEFAULT_IDLE_TIMEOUT_MS = 5 * 60 * 1000;
+const DEFAULT_IDLE_TIMEOUT_MS = 30 * 1000;
 
 // Resolve the idle timeout from the CLI flag, then the environment, then the
 // default. A value <= 0 (or a non-finite/negative override) disables the timeout
